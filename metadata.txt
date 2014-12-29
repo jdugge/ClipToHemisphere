@@ -1,0 +1,12 @@
+[general]
+name=Clip to Hemisphere
+qgisMinimumVersion=2.5
+description=Clip vector layers to the hemisphere of the earth centered on a user specified point in order to use them in an orthographic projection without introducing artefacts.
+category=Vector
+version=0.1
+author=Juernjakob Dugge
+email=juernjakob@gmail.com
+homepage=https://github.com/jdugge/ClipToHemisphere
+tracker=https://github.com/jdugge/ClipToHemisphere/issues
+repository=https://github.com/jdugge/ClipToHemisphere
+experimental=True
