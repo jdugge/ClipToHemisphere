@@ -46,8 +46,10 @@ cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 if cmd_folder not in sys.path:
     sys.path.insert(0, cmd_folder)
 
+
 def classFactory(iface):
     return ClipToHemisphereProviderPlugin()
+
 
 class ClipToHemisphereProviderPlugin:
 
@@ -131,7 +133,6 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
 
         settings = PyQt4.QtCore.QSettings()
         inputLayer = dataobjects.getObjectFromUri(inputFilename)
-        systemEncoding = settings.value('/UI/encoding', 'System')
         provider = inputLayer.dataProvider()
         sourceCrs = provider.crs()
 
@@ -167,12 +168,12 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
                 edgeWest = 180 - np.sign(centerLongitude) * \
                         (180 - abs(centerLongitude)) - 90
                 circlePoints = [[
-                    [QgsPoint(-180, latitude) for latitude in
-                        np.linspace(90, -90, segments / 8)] +
+                    [QgsPoint(-180, latitude) for
+                        latitude in np.linspace(90, -90, segments / 8)] +
                     [QgsPoint(longitude, -90) for longitude in
                         np.linspace(-180, edgeEast, segments / 8)] +
-                    [QgsPoint(edgeEast, latitude) for
-                        latitude in np.linspace(-90, 90, segments / 8)] +
+                    [QgsPoint(edgeEast, latitude) for latitude in
+                        np.linspace(-90, 90, segments / 8)] +
                     [QgsPoint(longitude, 90) for longitude in
                         np.linspace(edgeEast, -180, segments / 8)]
                     ],
@@ -202,12 +203,21 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
                     ]]
         # Hemisphere centered on one of the poles
         elif abs(centerLatitude) == 90:
-            circlePoints = [[[
-                QgsPoint(-180,  45 + 0.5 * centerLatitude),
-                QgsPoint( 180,  45 + 0.5 * centerLatitude),
-                QgsPoint( 180, -45 + 0.5 * centerLatitude),
-                QgsPoint(-180, -45 + 0.5 * centerLatitude)
-                ]]]
+            circlePoints = [[
+                [QgsPoint(-180, latitude) for latitude in
+                        np.linspace(45 + 0.5 * centerLatitude,
+                                   -45 + 0.5 * centerLatitude,
+                                   segments / 4)] +
+                [QgsPoint(longitude, -45 + 0.5 * centerLatitude)
+                        for longitude in
+                        np.linspace(-180, 180, segments / 4)] +
+                [QgsPoint(180, latitude) for latitude in
+                        np.linspace(-45 + 0.5 * centerLatitude,
+                                     45 + 0.5 * centerLatitude,
+                                   segments / 4)] +
+                [QgsPoint(longitude, 45 + 0.5 * centerLatitude) for longitude in
+                        np.linspace(180, -180, segments / 4)]
+                ]]
         # All other hemispheres
         else:
             # Create a circle in the orthographic projection, convert the
@@ -215,8 +225,8 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
             angles = np.linspace(0, 2 * np.pi, segments, endpoint=False)
             circlePoints = np.array([
                 transformTargetToSrc(
-                    QgsPoint(np.cos(angle) * earthRadius,
-                             np.sin(angle) * earthRadius)
+                    QgsPoint(np.cos(angle) * earthRadius * 0.9999,
+                             np.sin(angle) * earthRadius * 0.9999)
                             ) for angle in angles
             ])
 
@@ -240,17 +250,17 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
                 endGap / totalGap * cmath.rect(1, startAngle) +
                 startGap / totalGap * cmath.rect(1, endAngle))
             antimeridianPoint = transformTargetToSrc(QgsPoint(
-                np.sin(antimeridianAngle) * earthRadius,
-                np.cos(antimeridianAngle) * earthRadius
+                np.sin(antimeridianAngle) * earthRadius * 0.9999,
+                np.cos(antimeridianAngle) * earthRadius * 0.9999
                 ))
 
             # Close the polygon
-            circlePoints[0][0].extend([
-                QgsPoint( 180, antimeridianPoint[1]),
+            circlePoints[0][0].extend(
+                [QgsPoint( 180, antimeridianPoint[1]),
                 QgsPoint( 180, np.sign(centerLatitude) * 90),
                 QgsPoint(-180, np.sign(centerLatitude) * 90),
-                QgsPoint(-180, antimeridianPoint[1])
-                ])
+                QgsPoint(-180, antimeridianPoint[1])]
+                )
 
         # Create the feature and add it to the layer
         circle = QgsFeature()
@@ -262,11 +272,6 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
         # We need to add the clipping layer to the layer list in order to be
         # able to use them with processing.runalg()
         clipLayerReg = QgsMapLayerRegistry.instance().addMapLayer(clipLayer)
-        clipLayerDense = processing.runalg(
-            "qgis:densifygeometriesgivenaninterval",
-            clipLayerReg, 1, None)
-        clipLayerDenseReg = processing.load(clipLayerDense['OUTPUT'])
         processing.runalg("qgis:intersection", inputLayer,
-            clipLayerDenseReg, output)
-        QgsMapLayerRegistry.instance().removeMapLayer(clipLayerDenseReg.id())
+            clipLayerReg, output)
         QgsMapLayerRegistry.instance().removeMapLayer(clipLayerReg.id())

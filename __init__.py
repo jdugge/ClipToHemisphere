@@ -20,3 +20,8 @@
 __author__ = 'Juernjakob Dugge'
 __date__ = 'December 2014'
 __copyright__ = '(C) 2014, Juernjakob Dugge'
+
+from ClipToHemisphere import ClipToHemisphereProviderPlugin
+
+def classFactory(iface):
+    return ClipToHemisphereProviderPlugin()
