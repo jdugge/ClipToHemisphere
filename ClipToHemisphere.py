@@ -256,10 +256,12 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
 
             # Close the polygon
             circlePoints[0][0].extend(
-                [QgsPoint( 180, antimeridianPoint[1]),
-                QgsPoint( 180, np.sign(centerLatitude) * 90),
-                QgsPoint(-180, np.sign(centerLatitude) * 90),
-                QgsPoint(-180, antimeridianPoint[1])]
+                [QgsPoint(180, latitude) for latitude in
+                        np.linspace(antimeridianPoint[1],
+                            np.sign(centerLatitude) * 90, segments / 4)] +
+                [QgsPoint(-180, latitude) for latitude in
+                        np.linspace(np.sign(centerLatitude) * 90,
+                            antimeridianPoint[1], segments / 4)]
                 )
 
         # Create the feature and add it to the layer
