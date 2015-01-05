@@ -6,9 +6,9 @@ Plugin for the QGIS Processing framework to clip vector layers to one hemisphere
 When projecting data to the orthographic projection, features that cross the horizon can lead to unsightly artefacts.
 By clipping the data to the hemisphere that will be visible in the orthographic projection, these artifacts can be
 avoided. This plugin for the QGIS Processing framework takes a vector layer and a latitude and longitude for the
-center of the hemisphere and clips the vector layer accordingly.
+center of the hemisphere and clips the vector layer accordingly. The plugin takes care of special cases such as a hemisphere centered on the equator or on one of the poles.
 
-
+![Example output: Natural Earth data projected to an orthographic projection centered on 20°N 30°E](orthographic_lat_20_lon_30.png)
 
 Usage
 -----
