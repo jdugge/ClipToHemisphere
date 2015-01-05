@@ -31,8 +31,13 @@ import PyQt4.QtCore
 from processing.core.Processing import Processing
 from processing.core.AlgorithmProvider import AlgorithmProvider
 from processing.core.GeoAlgorithm import GeoAlgorithm
-from processing.core.parameters import ParameterVector, ParameterNumber
-from processing.core.outputs import OutputVector
+try:
+    from processing.parameters.ParameterVector import ParameterVector
+    from processing.parameters.ParameterNumber import ParameterNumber
+    from processing.outputs.OutputVector import OutputVector
+except ImportError:
+    from processing.core.parameters import ParameterVector, ParameterNumber
+    from processing.core.outputs import OutputVector
 from processing.core.ProcessingConfig import Setting, ProcessingConfig
 from processing.tools import dataobjects, vector
 
