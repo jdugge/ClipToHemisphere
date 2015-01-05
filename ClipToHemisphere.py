@@ -57,7 +57,7 @@ class ClipToHemisphereProviderPlugin:
         self.provider = ClipToHemisphereAlgorithmProvider()
 
     def initGui(self):
-        Processing.addProvider(self.provider)
+        Processing.addProvider(self.provider, updateList=True)
 
     def unload(self):
         Processing.removeProvider(self.provider)
