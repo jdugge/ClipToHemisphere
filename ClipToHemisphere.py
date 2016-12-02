@@ -4,8 +4,8 @@
 ***************************************************************************
     __init__.py
     ---------------------
-    Date                 : December 2014
-    Copyright            : (C) 2014 by Juernjakob Dugge
+    Date                 : December 2016
+    Copyright            : (C) 2016 by Juernjakob Dugge
     Email                : juernjakob at gmail dot com
 ***************************************************************************
 *                                                                         *
