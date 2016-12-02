@@ -167,13 +167,13 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
         # Hemisphere centered on the equator
         if centerLatitude == 0:
             # Hemisphere centered on the equator and including the antimeridian
-            if abs(centerLongitude) > 90:
+            if abs(centerLongitude) >= 90:
                 edgeEast = -180 - np.sign(centerLongitude) * \
                         (180 - abs(centerLongitude)) + 90
                 edgeWest = 180 - np.sign(centerLongitude) * \
                         (180 - abs(centerLongitude)) - 90
                 circlePoints = [[
-                    [QgsPoint(-180, latitude) for
+                    [QgsPoint(-180.01, latitude) for
                         latitude in np.linspace(90, -90, segments / 8)] +
                     [QgsPoint(longitude, -90) for longitude in
                         np.linspace(-180, edgeEast, segments / 8)] +
@@ -187,7 +187,7 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
                         np.linspace(90, -90, segments / 8)] +
                     [QgsPoint(longitude, -90) for longitude in
                         np.linspace(edgeWest, 180, segments / 8)] +
-                    [QgsPoint(180, latitude) for
+                    [QgsPoint(180.01, latitude) for
                         latitude in np.linspace(-90, 90, segments / 8)] +
                     [QgsPoint(longitude, 90) for longitude in
                         np.linspace(180, edgeWest, segments / 8)]
@@ -209,14 +209,14 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
         # Hemisphere centered on one of the poles
         elif abs(centerLatitude) == 90:
             circlePoints = [[
-                [QgsPoint(-180, latitude) for latitude in
+                [QgsPoint(-180.01, latitude) for latitude in
                         np.linspace(45 + 0.5 * centerLatitude,
                                    -45 + 0.5 * centerLatitude,
                                    segments / 4)] +
                 [QgsPoint(longitude, -45 + 0.5 * centerLatitude)
                         for longitude in
                         np.linspace(-180, 180, segments / 4)] +
-                [QgsPoint(180, latitude) for latitude in
+                [QgsPoint(180.01, latitude) for latitude in
                         np.linspace(-45 + 0.5 * centerLatitude,
                                      45 + 0.5 * centerLatitude,
                                    segments / 4)] +
@@ -261,10 +261,10 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
 
             # Close the polygon
             circlePoints[0][0].extend(
-                [QgsPoint(180, latitude) for latitude in
+                [QgsPoint(180.01, latitude) for latitude in
                         np.linspace(antimeridianPoint[1],
                             np.sign(centerLatitude) * 90, segments / 4)] +
-                [QgsPoint(-180, latitude) for latitude in
+                [QgsPoint(-180.01, latitude) for latitude in
                         np.linspace(np.sign(centerLatitude) * 90,
                             antimeridianPoint[1], segments / 4)]
                 )
