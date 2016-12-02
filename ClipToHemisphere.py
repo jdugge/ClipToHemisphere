@@ -18,8 +18,8 @@
 """
 
 __author__ = 'Juernjakob Dugge'
-__date__ = 'December 2014'
-__copyright__ = '(C) 2014, Juernjakob Dugge'
+__date__ = 'December 2016'
+__copyright__ = '(C) 2016, Juernjakob Dugge'
 
 import os
 import sys
@@ -279,6 +279,11 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
         # We need to add the clipping layer to the layer list in order to be
         # able to use them with processing.runalg()
         clipLayerReg = QgsMapLayerRegistry.instance().addMapLayer(clipLayer)
-        processing.runalg("qgis:intersection", inputLayer,
-            clipLayerReg, output)
+
+        if hasattr(processing.algs.qgis.Intersection.Intersection, "IGNORE_NULL"):
+            # Syntax changed on 2016-10-20: https://github.com/qgis/QGIS/commit/5ae0e784e78993870c416ff499616a5147803c2c
+            processing.runalg("qgis:intersection", inputLayer, clipLayerReg, False, output)
+        else:
+            processing.runalg("qgis:intersection", inputLayer, clipLayerReg, output)
+
         QgsMapLayerRegistry.instance().removeMapLayer(clipLayerReg.id())
