@@ -4,8 +4,8 @@
 ***************************************************************************
     __init__.py
     ---------------------
-    Date                 : December 2016
-    Copyright            : (C) 2016 by Juernjakob Dugge
+    Date                 : September 2020
+    Copyright            : (C) 2020 by Juernjakob Dugge
     Email                : juernjakob at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -18,211 +18,240 @@
 """
 
 __author__ = 'Juernjakob Dugge'
-__date__ = 'December 2016'
-__copyright__ = '(C) 2016, Juernjakob Dugge'
+__date__ = 'September 2020'
+__copyright__ = '(C) 2020, Juernjakob Dugge'
 
 import os
-import sys
-import inspect
 
-from qgis.core import *
-import PyQt4.QtCore
+from qgis.core import (
+    QgsApplication,
+    QgsProcessing,
+    QgsProcessingParameterFeatureSource,
+    QgsProcessingParameterNumber,
+    QgsProcessingProvider,
+    QgsCoordinateReferenceSystem,
+    QgsVectorLayer,
+    QgsFeature,
+    QgsGeometry,
+    QgsCoordinateTransform,
+    QgsPointXY,
+    QgsProject,
+    QgsProcessingParameterVectorDestination
+)
 
-from processing.core.Processing import Processing
-from processing.core.AlgorithmProvider import AlgorithmProvider
-from processing.core.GeoAlgorithm import GeoAlgorithm
-try:
-    from processing.parameters.ParameterVector import ParameterVector
-    from processing.parameters.ParameterNumber import ParameterNumber
-    from processing.outputs.OutputVector import OutputVector
-except ImportError:
-    from processing.core.parameters import ParameterVector, ParameterNumber
-    from processing.core.outputs import OutputVector
-from processing.core.ProcessingConfig import Setting, ProcessingConfig
-from processing.tools import dataobjects, vector
-
+from processing.algs.qgis.QgisAlgorithm import QgisAlgorithm
 import processing
-
 import numpy as np
 import cmath
 
-cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
-
-if cmd_folder not in sys.path:
-    sys.path.insert(0, cmd_folder)
+pluginPath = os.path.split(os.path.split(os.path.dirname(__file__))[0])[0]
 
 
-def classFactory(iface):
-    return ClipToHemisphereProviderPlugin()
-
-
-class ClipToHemisphereProviderPlugin:
-
+class ClipToHemisphereProvider(QgsProcessingProvider):
+    
     def __init__(self):
-        self.provider = ClipToHemisphereAlgorithmProvider()
+        QgsProcessingProvider.__init__(self)
+    
+    def unload(self):
+        pass
+    
+    def loadAlgorithms(self):
+        self.addAlgorithm(ClipToHemisphereAlgorithm())
+    
+    def id(self):
+        """
+        Returns the unique provider id, used for identifying the provider. This
+        string should be a unique, short, character only string, eg "qgis" or
+        "gdal". This string should not be localised.
+        """
+        return 'Clip to hemisphere'
+    
+    def name(self):
+        """
+        Returns the provider name, which is used to describe the provider
+        within the GUI.
 
+        This string should be short (e.g. "Lastools") and localised.
+        """
+        return self.tr('Clip to hemisphere')
+    
+    def longName(self):
+        """
+        Returns the a longer version of the provider name, which can include
+        extra details such as version numbers. E.g. "Lastools LIDAR tools
+        (version 2.2.1)". This string should be localised. The default
+        implementation returns the same string as name().
+        """
+        return self.name()
+
+
+class ClipToHemispherePlugin(object):
+    def __init__(self):
+        self.provider = None
+    
+    def initProcessing(self):
+        self.provider = ClipToHemisphereProvider()
+        QgsApplication.processingRegistry().addProvider(self.provider)
+    
     def initGui(self):
-        Processing.addProvider(self.provider, updateList=True)
-
+        self.initProcessing()
+    
     def unload(self):
-        Processing.removeProvider(self.provider)
+        QgsApplication.processingRegistry().removeProvider(self.provider)
 
 
-class ClipToHemisphereAlgorithmProvider(AlgorithmProvider):
-
-    def __init__(self):
-        AlgorithmProvider.__init__(self)
-
-        self.alglist = [ClipToHemisphereAlgorithm()]
-        for alg in self.alglist:
-            alg.provider = self
-
-    def initializeSettings(self):
-        AlgorithmProvider.initializeSettings(self)
-
-    def unload(self):
-        AlgorithmProvider.unload(self)
-
-    def getName(self):
-        return 'Clip to Hemisphere'
-
-    def getDescription(self):
-        return 'Clip to Hemisphere'
-
-    def getIcon(self):
-        return AlgorithmProvider.getIcon(self)
-
-    def _loadAlgorithms(self):
-        self.algs = self.alglist
-
-
-class ClipToHemisphereAlgorithm(GeoAlgorithm):
-    OUTPUT_LAYER = 'OUTPUT_LAYER'
-    INPUT_LAYER = 'INPUT_LAYER'
+class ClipToHemisphereAlgorithm(QgisAlgorithm):
+    INPUT = 'INPUT'
+    OUTPUT = 'OUTPUT'
     CENTER_LATITUDE = 'CENTER_LATITUDE'
     CENTER_LONGITUDE = 'CENTER_LONGITUDE'
     SEGMENTS = 'SEGMENTS'
-
-    def defineCharacteristics(self):
-        """Here we define the inputs and output of the algorithm, along
-        with some other properties.
-        """
-        self.name = 'Clip a vector layer to the hemisphere centred on a ' \
-            'user specified point'
-        self.group = 'Clip to Hemisphere'
-
-        self.addParameter(ParameterVector(self.INPUT_LAYER, 'Input layer',
-                          [ParameterVector.VECTOR_TYPE_ANY], False))
-        self.addParameter(ParameterNumber(self.CENTER_LATITUDE, 'Latitude of '
-            'center of hemisphere',
-                          default=0.0))
-        self.addParameter(ParameterNumber(self.CENTER_LONGITUDE, 'Longitude '
-            'of center of hemisphere',
-                          default=0.0))
-        self.addParameter(ParameterNumber(self.SEGMENTS, 'Number of segments '
-            'for approximating the hemisphere',
-                          default=500))
-        self.addOutput(OutputVector(self.OUTPUT_LAYER,
-                       'Output clipped to hemisphere'))
-
-    def processAlgorithm(self, progress):
-        """Here is where the processing itself takes place."""
-
-        inputFilename = self.getParameterValue(self.INPUT_LAYER)
-        centerLatitude = float(self.getParameterValue(self.CENTER_LATITUDE))
-        centerLongitude = float(self.getParameterValue(self.CENTER_LONGITUDE))
-        segments = self.getParameterValue(self.SEGMENTS)
-        output = self.getOutputValue(self.OUTPUT_LAYER)
-
+    
+    def __init__(self):
+        super().__init__()
+    
+    def initAlgorithm(self, config=None):
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr('Input layer'),
+                [QgsProcessing.TypeVectorAnyGeometry]
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterVectorDestination(
+                self.OUTPUT,
+                self.tr('Output layer')
+            )
+        )
+        
+        param = QgsProcessingParameterNumber(
+            self.CENTER_LATITUDE,
+            self.tr('Center latitude'),
+            type=QgsProcessingParameterNumber.Double,
+            minValue=-90,
+            maxValue=90
+        )
+        param.setMetadata({'widget_wrapper':
+                               {'decimals': 1}
+                           })
+        self.addParameter(param)
+        
+        param = QgsProcessingParameterNumber(
+            self.CENTER_LONGITUDE,
+            self.tr('Center longitude'),
+            type=QgsProcessingParameterNumber.Double,
+            minValue=-180,
+            maxValue=180
+        )
+        param.setMetadata({'widget_wrapper':
+                               {'decimals': 1}
+                           })
+        self.addParameter(param)
+        
+        self.addParameter(QgsProcessingParameterNumber(
+            self.SEGMENTS,
+            self.tr('Segments'),
+            defaultValue=720,
+            minValue=3,
+            type=QgsProcessingParameterNumber.Integer
+        ))
+    
+    def name(self):
+        return 'cliptohemisphere'
+    
+    def displayName(self):
+        return self.tr('Clip to hemisphere')
+    
+    def processAlgorithm(self, parameters, context, feedback):
+        source = self.parameterAsSource(parameters, self.INPUT, context)
+        sourceCrs = source.sourceCrs()
+        centerLatitude = self.parameterAsDouble(parameters,
+                                                self.CENTER_LATITUDE, context)
+        centerLongitude = self.parameterAsDouble(parameters,
+                                                 self.CENTER_LONGITUDE, context)
+        segments = self.parameterAsInt(parameters, self.SEGMENTS, context)
+        
         earthRadius = 6371000
-
-        settings = PyQt4.QtCore.QSettings()
-        inputLayer = dataobjects.getObjectFromUri(inputFilename)
-        provider = inputLayer.dataProvider()
-        sourceCrs = provider.crs()
-
-        # It would be nice to give the output layer a nicer name than "Output
-        # clipped to hemisphere", but I don't know how to do that. The code
-        # below doesn't work
-        #output.name = inputLayer.name() + u' clipped to hemisphere ' + \
-        #    str(centerLatitude) + u', ' + str(centerLongitude)
-
         targetProjString = "+proj=ortho +lat_0=" + str(centerLatitude) + \
-            " +lon_0=" + str(centerLongitude) + \
-            " +x_0=0 +y_0=0 +a=" + str(earthRadius) + \
-            " +b=" + str(earthRadius) + \
-            " +units=m +no_defs"
+                           " +lon_0=" + str(centerLongitude) + \
+                           " +x_0=0 +y_0=0 +a=" + str(earthRadius) + \
+                           " +b=" + str(earthRadius) + \
+                           " +units=m +no_defs"
         targetCrs = QgsCoordinateReferenceSystem()
-        targetCrs.createFromProj4(targetProjString)
-
+        targetCrs.createFromProj(targetProjString)
+        
         transformTargetToSrc = QgsCoordinateTransform(targetCrs,
-            sourceCrs).transform
+                                                      sourceCrs,
+                                                      QgsProject.instance()).transform
         transformSrcToTarget = QgsCoordinateTransform(sourceCrs,
-            targetCrs).transform
-
+                                                      targetCrs,
+                                                      QgsProject.instance()).transform
         clipLayer = QgsVectorLayer("MultiPolygon", "clipLayer", "memory")
         pr = clipLayer.dataProvider()
-
+        
         # Handle edge cases:
         # Hemisphere centered on the equator
         if centerLatitude == 0:
             # Hemisphere centered on the equator and including the antimeridian
             if abs(centerLongitude) >= 90:
                 edgeEast = -180 - np.sign(centerLongitude) * \
-                        (180 - abs(centerLongitude)) + 90
+                           (180 - abs(centerLongitude)) + 90
                 edgeWest = 180 - np.sign(centerLongitude) * \
-                        (180 - abs(centerLongitude)) - 90
+                           (180 - abs(centerLongitude)) - 90
                 circlePoints = [[
-                    [QgsPoint(-180.01, latitude) for
-                        latitude in np.linspace(90, -90, segments / 8)] +
-                    [QgsPoint(longitude, -90) for longitude in
-                        np.linspace(-180, edgeEast, segments / 8)] +
-                    [QgsPoint(edgeEast, latitude) for latitude in
-                        np.linspace(-90, 90, segments / 8)] +
-                    [QgsPoint(longitude, 90) for longitude in
-                        np.linspace(edgeEast, -180, segments / 8)]
-                    ],
+                    [QgsPointXY(-180.01, latitude) for
+                     latitude in np.linspace(90, -90, segments // 8)] +
+                    [QgsPointXY(longitude, -90) for longitude in
+                     np.linspace(-180, edgeEast, segments // 8)] +
+                    [QgsPointXY(edgeEast, latitude) for latitude in
+                     np.linspace(-90, 90, segments // 8)] +
+                    [QgsPointXY(longitude, 90) for longitude in
+                     np.linspace(edgeEast, -180, segments // 8)]
+                ],
                     [
-                    [QgsPoint(edgeWest, latitude) for latitude in
-                        np.linspace(90, -90, segments / 8)] +
-                    [QgsPoint(longitude, -90) for longitude in
-                        np.linspace(edgeWest, 180, segments / 8)] +
-                    [QgsPoint(180.01, latitude) for
-                        latitude in np.linspace(-90, 90, segments / 8)] +
-                    [QgsPoint(longitude, 90) for longitude in
-                        np.linspace(180, edgeWest, segments / 8)]
+                        [QgsPointXY(edgeWest, latitude) for latitude in
+                         np.linspace(90, -90, segments // 8)] +
+                        [QgsPointXY(longitude, -90) for longitude in
+                         np.linspace(edgeWest, 180, segments // 8)] +
+                        [QgsPointXY(180.01, latitude) for
+                         latitude in np.linspace(-90, 90, segments // 8)] +
+                        [QgsPointXY(longitude, 90) for longitude in
+                         np.linspace(180, edgeWest, segments // 8)]
                     ]]
             # Hemisphere centered on the equator not including the antimeridian
             else:
                 edgeWest = centerLongitude - 90
                 edgeEast = centerLongitude + 90
                 circlePoints = [[
-                    [QgsPoint(edgeWest, latitude) for latitude in
-                        np.linspace(90, -90, segments / 4)] +
-                    [QgsPoint(longitude, -90) for longitude in
-                        np.linspace(edgeWest, edgeEast, segments / 4)] +
-                    [QgsPoint(edgeEast, latitude) for
-                        latitude in np.linspace(-90, 90, segments / 4)] +
-                    [QgsPoint(longitude, 90) for longitude in
-                        np.linspace(edgeEast, edgeWest, segments / 4)]
-                    ]]
+                    [QgsPointXY(edgeWest, latitude) for latitude in
+                     np.linspace(90, -90, segments // 4)] +
+                    [QgsPointXY(longitude, -90) for longitude in
+                     np.linspace(edgeWest, edgeEast, segments // 4)] +
+                    [QgsPointXY(edgeEast, latitude) for
+                     latitude in np.linspace(-90, 90, segments // 4)] +
+                    [QgsPointXY(longitude, 90) for longitude in
+                     np.linspace(edgeEast, edgeWest, segments // 4)]
+                ]]
         # Hemisphere centered on one of the poles
         elif abs(centerLatitude) == 90:
             circlePoints = [[
-                [QgsPoint(-180.01, latitude) for latitude in
-                        np.linspace(45 + 0.5 * centerLatitude,
-                                   -45 + 0.5 * centerLatitude,
-                                   segments / 4)] +
-                [QgsPoint(longitude, -45 + 0.5 * centerLatitude)
-                        for longitude in
-                        np.linspace(-180, 180, segments / 4)] +
-                [QgsPoint(180.01, latitude) for latitude in
-                        np.linspace(-45 + 0.5 * centerLatitude,
-                                     45 + 0.5 * centerLatitude,
-                                   segments / 4)] +
-                [QgsPoint(longitude, 45 + 0.5 * centerLatitude) for longitude in
-                        np.linspace(180, -180, segments / 4)]
-                ]]
+                [QgsPointXY(-180.01, latitude) for latitude in
+                 np.linspace(45 + 0.5 * centerLatitude,
+                             -45 + 0.5 * centerLatitude,
+                             segments // 4)] +
+                [QgsPointXY(longitude, -45 + 0.5 * centerLatitude)
+                 for longitude in
+                 np.linspace(-180, 180, segments // 4)] +
+                [QgsPointXY(180.01, latitude) for latitude in
+                 np.linspace(-45 + 0.5 * centerLatitude,
+                             45 + 0.5 * centerLatitude,
+                             segments // 4)] +
+                [QgsPointXY(longitude, 45 + 0.5 * centerLatitude) for longitude
+                 in
+                 np.linspace(180, -180, segments // 4)]
+            ]]
         # All other hemispheres
         else:
             # Create a circle in the orthographic projection, convert the
@@ -230,17 +259,17 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
             angles = np.linspace(0, 2 * np.pi, segments, endpoint=False)
             circlePoints = np.array([
                 transformTargetToSrc(
-                    QgsPoint(np.cos(angle) * earthRadius * 0.9999,
-                             np.sin(angle) * earthRadius * 0.9999)
-                            ) for angle in angles
+                    QgsPointXY(np.cos(angle) * earthRadius * 0.9999,
+                               np.sin(angle) * earthRadius * 0.9999)
+                ) for angle in angles
             ])
-
+            
             # Sort the projected circle coordinates from west to east
             sortIdx = np.argsort(circlePoints[:, 0])
             circlePoints = circlePoints[sortIdx, :]
-            circlePoints = [[[QgsPoint(point[0], point[1])
-                for point in circlePoints]]]
-
+            circlePoints = [[[QgsPointXY(point[0], point[1])
+                              for point in circlePoints]]]
+            
             # Find the circle point in the orthographic projection that lies
             # on the antimeridian by linearly interpolating the angles of the
             # first and last coordinates
@@ -254,36 +283,31 @@ class ClipToHemisphereAlgorithm(GeoAlgorithm):
             antimeridianAngle = cmath.phase(
                 endGap / totalGap * cmath.rect(1, startAngle) +
                 startGap / totalGap * cmath.rect(1, endAngle))
-            antimeridianPoint = transformTargetToSrc(QgsPoint(
+            antimeridianPoint = transformTargetToSrc(QgsPointXY(
                 np.sin(antimeridianAngle) * earthRadius * 0.9999,
                 np.cos(antimeridianAngle) * earthRadius * 0.9999
-                ))
-
+            ))
+            
             # Close the polygon
             circlePoints[0][0].extend(
-                [QgsPoint(180.01, latitude) for latitude in
-                        np.linspace(antimeridianPoint[1],
-                            np.sign(centerLatitude) * 90, segments / 4)] +
-                [QgsPoint(-180.01, latitude) for latitude in
-                        np.linspace(np.sign(centerLatitude) * 90,
-                            antimeridianPoint[1], segments / 4)]
-                )
-
+                [QgsPointXY(180.01, latitude) for latitude in
+                 np.linspace(antimeridianPoint[1],
+                             np.sign(centerLatitude) * 90, segments // 4)] +
+                [QgsPointXY(-180.01, latitude) for latitude in
+                 np.linspace(np.sign(centerLatitude) * 90,
+                             antimeridianPoint[1], segments // 4)]
+            )
+        
         # Create the feature and add it to the layer
         circle = QgsFeature()
-        circle.setGeometry(QgsGeometry.fromMultiPolygon(circlePoints))
-
+        circle.setGeometry(QgsGeometry.fromMultiPolygonXY(circlePoints))
+        
         pr.addFeatures([circle])
-        pr.updateExtents()
-
-        # We need to add the clipping layer to the layer list in order to be
-        # able to use them with processing.runalg()
-        clipLayerReg = QgsMapLayerRegistry.instance().addMapLayer(clipLayer)
-
-        if hasattr(processing.algs.qgis.Intersection.Intersection, "IGNORE_NULL"):
-            # Syntax changed on 2016-10-20: https://github.com/qgis/QGIS/commit/5ae0e784e78993870c416ff499616a5147803c2c
-            processing.runalg("qgis:intersection", inputLayer, clipLayerReg, False, output)
-        else:
-            processing.runalg("qgis:intersection", inputLayer, clipLayerReg, output)
-
-        QgsMapLayerRegistry.instance().removeMapLayer(clipLayerReg.id())
+        
+        result = processing.run('native:intersection', {
+            'INPUT': parameters['INPUT'],
+            'OVERLAY': clipLayer,
+            'OUTPUT': parameters['OUTPUT']
+        }, is_child_algorithm=True, context=context, feedback=feedback)
+        
+        return {self.OUTPUT: result['OUTPUT']}

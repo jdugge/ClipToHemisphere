@@ -1,11 +1,12 @@
 [general]
 name=Clip to Hemisphere
-qgisMinimumVersion=2.5
+qgisMinimumVersion=2.99
+qgisMaximumVersion=3.99
 description=Clip vector layers to the hemisphere of the earth centered on a user
     specified point in order to use them in an orthographic projection without
     introducing artefacts.
 category=Vector
-version=0.2
+version=0.4
 author=Juernjakob Dugge
 email=juernjakob@gmail.com
 homepage=https://github.com/jdugge/ClipToHemisphere
@@ -13,13 +14,15 @@ tracker=https://github.com/jdugge/ClipToHemisphere/issues
 repository=https://github.com/jdugge/ClipToHemisphere
 experimental=False
 about=When projecting data to the orthographic projection, features that cross
-    the horizon can lead to unsightly artefacts. By clipping the data to the
+    the horizon can lead to unsightly artifacts. By clipping the data to the
     hemisphere that will be visible in the orthographic projection, these
     artifacts can be avoided. This plugin for the QGIS Processing framework
     takes a vector layer and a latitude and longitude for the center of the
     hemisphere and clips the vector layer accordingly. The plugin takes care of
     special cases such as a hemisphere centered on the equator or on one of the
     poles.
-changelog=0.2 - Fixed issue with linear features at 180° W/E, made plugin
+changelog=0.4 - Made plugin compatible with QGIS 3
+    0.3 - Added warning if input layer does not use EPSG:4326
+    0.2 - Fixed issue with linear features at 180° W/E, made plugin
     compatible with QGIS 2.18
     0.1 - Initial version

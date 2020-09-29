@@ -4,8 +4,8 @@
 ***************************************************************************
     __init__.py
     ---------------------
-    Date                 : December 2016
-    Copyright            : (C) 2016 by Juernjakob Dugge
+    Date                 : September 2020
+    Copyright            : (C) 2020 by Juernjakob Dugge
     Email                : juernjakob at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -18,10 +18,10 @@
 """
 
 __author__ = 'Juernjakob Dugge'
-__date__ = 'December 2016'
-__copyright__ = '(C) 2016, Juernjakob Dugge'
+__date__ = 'September 2020'
+__copyright__ = '(C) 2020, Juernjakob Dugge'
 
-from ClipToHemisphere import ClipToHemisphereProviderPlugin
 
 def classFactory(iface):
-    return ClipToHemisphereProviderPlugin()
+    from .ClipToHemisphere import ClipToHemispherePlugin
+    return ClipToHemispherePlugin()
